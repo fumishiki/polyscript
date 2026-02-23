@@ -1,16 +1,2 @@
-use anyhow::{bail, Result};
-use std::process::Command;
-
-/// Run a Julia script via subprocess (libjulia FFI is optional).
-/// To use native FFI, add libjulia-sys and replace this stub.
-pub fn run(script: &str, args: &[String]) -> Result<()> {
-    let status = Command::new("julia")
-        .arg(script)
-        .args(args)
-        .status()?;
-
-    if !status.success() {
-        bail!("Julia exited with {}", status);
-    }
-    Ok(())
-}
+/// Julia ブリッジ — sp_bridge! の生成コードと同等。libjulia-sys への移行時はここを差し替える。
+pub fn run(s: &str, a: &[String]) -> anyhow::Result<()> { super::sp("julia", &[], s, a) }
