@@ -1,0 +1,21 @@
+[package]
+name = "polyscript"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# Python FFI
+pyo3 = { version = "0.22", features = ["auto-initialize"] }
+# C++ FFI (via bindgen at build time)
+# Julia FFI
+# libjulia-sys = "0.2"  # uncomment when needed
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+# Error handling
+anyhow = "1"
+# Dynamic library loading (C++ FFI)
+libloading = "0.8"
+
+[build-dependencies]
+# bindgen = "0.69"  # uncomment for C++ header binding generation
