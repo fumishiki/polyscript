@@ -1,0 +1,12 @@
+[tools]
+python    = "3.11"
+julia     = "1.12"
+go        = "1.22"
+node      = "20"
+deno      = "1.40"
+lua       = "5.4"
+R         = "4.3"
+zig       = "0.12"
+kotlin    = "1.9"
+nim       = "2.0"
+# gfortran, wasmtime, ghc, swift — install via system package manager

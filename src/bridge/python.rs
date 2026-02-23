@@ -12,8 +12,16 @@ pub fn run(script: &str, args: &[String]) -> Result<()> {
         let argv: Vec<&str> = std::iter::once(script)
             .chain(args.iter().map(|s| s.as_str()))
             .collect();
-        let py_args = PyList::new_bound(py, &argv);
-        sys.setattr("argv", py_args)?;
+        sys.setattr("argv", PyList::new_bound(py, &argv))?;
+
+        // インプロセス実行時は os.environ にも POLYSCRIPT_IPC_PATH を注入する
+        // （subprocess と違い親プロセスの set_var が Python os.environ に自動反映されないため）
+        if let Ok(ipc) = std::env::var("POLYSCRIPT_IPC_PATH") {
+            py.import_bound("os")?
+                .getattr("environ")?
+                .set_item("POLYSCRIPT_IPC_PATH", ipc)?;
+        }
+
         py.run_bound(&code, None, None)?;
         Ok(())
     })

@@ -1,11 +1,12 @@
 pub mod python;
 pub mod cpp;
+pub mod ktn;
 
 use anyhow::{ensure, Result};
 use std::process::Command;
 
 /// 汎用 subprocess ランナー。`cmd [pre...] script [args...]` を実行する。
-pub(super) fn sp(cmd: &str, pre: &[&str], script: &str, args: &[String]) -> Result<()> {
+pub(crate) fn sp(cmd: &str, pre: &[&str], script: &str, args: &[String]) -> Result<()> {
     let s = Command::new(cmd).args(pre).arg(script).args(args).status()?;
     ensure!(s.success(), "{cmd} exited with {s}");
     Ok(())

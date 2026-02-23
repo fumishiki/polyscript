@@ -2,6 +2,13 @@ use anyhow::{bail, Result};
 use libloading::{Library, Symbol};
 use std::ffi::CString;
 
+/// bindgen 生成バインディング（compile-time known C FFI シンボル用）。
+/// 実行時不明ライブラリには下の libloading を引き続き使用する。
+#[allow(unused, non_camel_case_types, non_snake_case, non_upper_case_globals)]
+mod ffi {
+    include!(concat!(env!("OUT_DIR"), "/polyscript_ffi.rs"));
+}
+
 /// Dynamically load a compiled C++ shared library and call a function.
 /// The C++ function must have signature: `extern "C" int run(int argc, const char** argv)`
 pub fn run(lib_path: &str, func_name: &str, args: &[String]) -> Result<()> {

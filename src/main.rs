@@ -4,6 +4,7 @@ use serde::Deserialize;
 use std::collections::HashMap;
 
 mod bridge;
+mod daemon;
 use bridge::*;
 
 // ── CLI ──────────────────────────────────────────────────────────────────────
@@ -66,6 +67,8 @@ enum Cmd {
     Swift(S),
     /// Kotlin スクリプト（kotlinc -script）
     Kt(S),
+    /// Kotlin AOT（kotlinc compile → java -jar）
+    Ktn(S),
     /// Nim スクリプト（nim r）
     Nim(S),
     /// Fortran ソース（gfortran compile + run）
@@ -83,6 +86,23 @@ enum Cmd {
         #[arg(trailing_var_arg = true)]
         specs: Vec<String>,
     },
+    /// デーモンモード（Unix ソケット常駐ランタイム）
+    Daemon {
+        #[command(subcommand)]
+        cmd: DaemonCmd,
+    },
+}
+
+#[derive(Subcommand)]
+enum DaemonCmd {
+    /// デーモンをバックグラウンドで起動
+    Start,
+    /// サーバーループ（内部用 — 直接呼び出し不要）
+    Serve,
+    /// デーモン経由でスクリプトを実行: <lang> <script> [args...]
+    Run { lang: String, script: String, args: Vec<String> },
+    /// デーモンを停止
+    Stop,
 }
 
 // ── polyscript.toml ──────────────────────────────────────────────────────────
@@ -98,7 +118,7 @@ struct ScriptEntry {
     script: String,
 }
 
-// ── 言語ディスパッチャ（Run / Parallel から共用）────────────────────────────
+// ── 言語ディスパッチャ ────────────────────────────────────────────────────
 
 fn dispatch_lang(lang: &str, script: &str, args: &[String]) -> Result<()> {
     match lang {
@@ -115,6 +135,7 @@ fn dispatch_lang(lang: &str, script: &str, args: &[String]) -> Result<()> {
         "hs"    => hs::run(script, args),
         "swift" => swift::run(script, args),
         "kt"    => kt::run(script, args),
+        "ktn"   => ktn::run(script, args),
         "nim"   => nim::run(script, args),
         "fort"  => fort::run(script, args),
         _ => bail!("unknown language: {lang}"),
@@ -149,6 +170,7 @@ fn main() -> Result<()> {
         Hs(a)    => hs::run(&a.script, &a.args),
         Swift(a) => swift::run(&a.script, &a.args),
         Kt(a)    => kt::run(&a.script, &a.args),
+        Ktn(a)   => ktn::run(&a.script, &a.args),
         Nim(a)   => nim::run(&a.script, &a.args),
         Fort(a)  => fort::run(&a.script, &a.args),
         Cpp { lib, func, args } => cpp::run(&lib, &func, &args),
@@ -169,7 +191,12 @@ fn main() -> Result<()> {
                     let lang   = p.next().ok_or_else(|| anyhow::anyhow!("empty spec"))?.to_owned();
                     let script = p.next().ok_or_else(|| anyhow::anyhow!("missing script"))?.to_owned();
                     let args: Vec<String> = p.map(String::from).collect();
-                    dispatch_lang(&lang, &script, &args)
+                    // PyO3 はスレッド間で GIL を競合するため subprocess にフォールバック
+                    if lang == "py" {
+                        bridge::sp("python3", &[], &script, &args)
+                    } else {
+                        dispatch_lang(&lang, &script, &args)
+                    }
                 })
             }).collect();
             for h in handles {
@@ -177,5 +204,13 @@ fn main() -> Result<()> {
             }
             Ok(())
         }
+
+        Daemon { cmd } => match cmd {
+            DaemonCmd::Start                        => daemon::start(),
+            DaemonCmd::Serve                        => daemon::serve(),
+            DaemonCmd::Run { lang, script, args }   => daemon::run_via(&lang, &script, &args),
+            DaemonCmd::Stop                         => daemon::stop(),
+        },
     }
 }
+

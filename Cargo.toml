@@ -19,6 +19,8 @@ libloading = "0.8"
 # polyscript.toml registry
 toml = "0.8"
 serde = { version = "1", features = ["derive"] }
+# daemon mode — Unix socket JSON protocol
+serde_json = "1"
 
 [build-dependencies]
-# bindgen = "0.69"  # uncomment for C++ header binding generation
+bindgen = "0.69"
