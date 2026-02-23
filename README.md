@@ -57,7 +57,7 @@ sp_bridge!(js,    "node");
 |---|---|---|---|---|
 | `py` | Python | PyO3 in-process | **zero** | ML / scripting |
 | `cpp` | C++ `.so` | libloading | **zero** | SIMD, native libs |
-| `jl` | Julia | subprocess | 1–4 s | ODE, SciML, numerics |
+| `jl` | Julia | juliac AOT compile+run | zero (AOT) | ODE, SciML, numerics |
 | `go` | Go | subprocess | ~30 ms | CLI tools, REST APIs |
 | `js` | Node.js | subprocess | ~40 ms | JSON, npm ecosystem |
 | `ts` | Deno | subprocess | ~60 ms | TypeScript, WASM |
@@ -71,6 +71,8 @@ sp_bridge!(js,    "node");
 | `kt` | Kotlin | subprocess | ~1 s | JVM, Android, coroutines |
 | `nim` | Nim | subprocess | ~100 ms | C-speed scripting |
 | `fort` | gfortran | compile+run | compile+~5 ms | HPC, CFD, legacy solvers |
+| `run` | polyscript.toml | alias dispatch | — | script registry |
+| `parallel` | any | thread-parallel | — | concurrent dispatch |
 
 ---
 
@@ -110,7 +112,7 @@ Requires **Python development headers** for PyO3. Each subcommand additionally n
 # Python — in-process via PyO3, zero subprocess overhead
 polyscript py  scripts/python/example.py  hello world
 
-# Julia — subprocess
+# Julia — juliac AOT compile+run (requires Julia 1.12+)
 polyscript jl  scripts/julia/example.jl   hello world
 
 # Go — `go run` subprocess
@@ -132,6 +134,15 @@ polyscript fort scripts/fortran/example.f90  hello world
 # WebAssembly (compile .wat → .wasm first)
 wat2wasm scripts/wasm/example.wat -o /tmp/example.wasm
 polyscript wasm /tmp/example.wasm
+
+# polyscript.toml alias
+polyscript run preprocess /data/raw.parquet /tmp/features.arrow
+
+# Parallel execution — runs py and r concurrently in separate threads
+polyscript parallel "py scripts/python/example.py hello" "r scripts/r/example.r hello"
+
+# IPC — auto-generate POLYSCRIPT_IPC_PATH and inject into subprocess env
+polyscript --ipc-format=arrow py scripts/python/example.py
 ```
 
 ---
@@ -278,23 +289,11 @@ Arrow.write(ARGS[2], df)
 
 ## Known limitations
 
-- **Julia cold-start** — 1–4 s JIT per call. Mitigation: `libjulia-sys` native FFI (planned).
-- **Kotlin cold-start** — ~1 s JVM boot. Mitigation: GraalVM Native Image (planned).
+- **Kotlin cold-start** — ~1 s JVM boot.
+- **Julia requires juliac 1.12+** — experimental AOT compiler; Julia 1.12+ required.
 - **Concurrent `fort`** — both calls overwrite `/tmp/polyscript_out`. Mitigation: per-PID path (planned).
 - **No structured IPC** — data contracts are the caller's responsibility. Arrow IPC file path is the recommended workaround.
 - **Wasm `.wat` requires pre-compilation** — `wat2wasm example.wat -o example.wasm` before use.
-
----
-
-## Roadmap
-
-- [ ] `libjulia-sys` FFI — eliminate Julia cold-start
-- [ ] GraalVM Native Image mode for Kotlin
-- [ ] Per-PID temp binary for concurrent `fort` calls
-- [ ] `--ipc-format=arrow|parquet` — auto-inject `POLYSCRIPT_IPC_PATH`
-- [ ] `devbox.json` / `Dockerfile` — reproducible multi-runtime environment
-- [ ] `polyscript.toml` — script registry with named aliases
-- [ ] Parallel execution: `polyscript parallel py a.py -- jl b.jl`
 
 ---
 

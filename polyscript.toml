@@ -1,0 +1,9 @@
+# polyscript.toml — script registry
+# Usage: polyscript run <name> [args...]
+
+[scripts]
+preprocess = { lang = "py",   script = "pipeline/preprocess.py" }
+simulate   = { lang = "jl",   script = "pipeline/simulate.jl"   }
+plot       = { lang = "r",    script = "pipeline/plot.r"         }
+serve      = { lang = "go",   script = "server/main.go"          }
+validate   = { lang = "hs",   script = "rules/validate.hs"       }

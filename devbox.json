@@ -1,0 +1,30 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.13.0/.schema/devbox.schema.json",
+  "packages": [
+    "python311",
+    "julia-bin",
+    "go_1_22",
+    "nodejs_20",
+    "deno",
+    "lua54",
+    "R",
+    "zig_0_12",
+    "wasmtime",
+    "ghc",
+    "kotlin",
+    "nim",
+    "gcc",
+    "rustup"
+  ],
+  "shell": {
+    "init_hook": [
+      "rustup default stable"
+    ],
+    "scripts": {
+      "build": "cargo build --release",
+      "test":  "cargo test",
+      "lint":  "cargo clippy --all-targets -- -D warnings",
+      "fmt":   "cargo fmt --all -- --check"
+    }
+  }
+}

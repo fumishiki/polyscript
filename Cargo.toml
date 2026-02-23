@@ -16,6 +16,9 @@ clap = { version = "4", features = ["derive"] }
 anyhow = "1"
 # Dynamic library loading (C++ FFI)
 libloading = "0.8"
+# polyscript.toml registry
+toml = "0.8"
+serde = { version = "1", features = ["derive"] }
 
 [build-dependencies]
 # bindgen = "0.69"  # uncomment for C++ header binding generation

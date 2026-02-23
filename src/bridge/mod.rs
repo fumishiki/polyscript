@@ -13,7 +13,7 @@ pub(super) fn sp(cmd: &str, pre: &[&str], script: &str, args: &[String]) -> Resu
 
 /// コンパイル→実行の 2 ステップランナー（Fortran など）。
 pub(super) fn cr(compiler: &str, cflags: &[&str], script: &str, args: &[String]) -> Result<()> {
-    let out = std::env::temp_dir().join("polyscript_out");
+    let out = format!("/tmp/polyscript_out_{}", std::process::id());
     ensure!(
         Command::new(compiler).args(cflags).arg(script).arg("-o").arg(&out).status()?.success(),
         "{compiler}: compilation failed"
