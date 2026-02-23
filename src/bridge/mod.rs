@@ -66,7 +66,19 @@ sp_bridge!(ts, "deno", "run");
 sp_bridge!(lua, "lua");
 sp_bridge!(r, "Rscript");
 sp_bridge!(mojo, "mojo");
-sp_bridge!(zig, "zig", "run");
+// `zig run <file> -- <args>` — zig requires `--` to separate user args
+pub mod zig {
+    use anyhow::{Result, ensure};
+    use std::process::Command;
+    pub fn run(s: &str, a: &[String]) -> Result<()> {
+        let st = Command::new("zig")
+            .args(["run", s, "--"])
+            .args(a)
+            .status()?;
+        ensure!(st.success(), "zig exited with {st}");
+        Ok(())
+    }
+}
 sp_bridge!(wasm, "wasmtime", "run");
 sp_bridge!(hs, "runghc");
 sp_bridge!(swift, "swift");
