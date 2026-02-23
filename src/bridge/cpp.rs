@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use libloading::{Library, Symbol};
 use std::ffi::CString;
 
@@ -12,7 +12,8 @@ mod ffi {
 /// Dynamically load a compiled C++ shared library and call a function.
 /// The C++ function must have signature: `extern "C" int run(int argc, const char** argv)`
 pub fn run(lib_path: &str, func_name: &str, args: &[String]) -> Result<()> {
-    let c_args: Vec<CString> = args.iter()
+    let c_args: Vec<CString> = args
+        .iter()
         .map(|s| CString::new(s.as_str()).unwrap())
         .collect();
     let c_ptrs: Vec<*const i8> = c_args.iter().map(|s| s.as_ptr()).collect();

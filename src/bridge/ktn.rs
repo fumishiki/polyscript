@@ -1,4 +1,4 @@
-use anyhow::{ensure, Result};
+use anyhow::{Result, ensure};
 use std::process::Command;
 
 /// Kotlin AOT ブリッジ — kotlinc で fat JAR にコンパイルし java -jar で実行。
@@ -14,7 +14,11 @@ pub fn run(s: &str, a: &[String]) -> Result<()> {
         "kotlinc: compilation failed"
     );
     ensure!(
-        Command::new("java").args(["-jar", &jar]).args(a).status()?.success(),
+        Command::new("java")
+            .args(["-jar", &jar])
+            .args(a)
+            .status()?
+            .success(),
         "java -jar: non-zero exit"
     );
     Ok(())

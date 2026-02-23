@@ -1,13 +1,17 @@
-pub mod python;
 pub mod cpp;
 pub mod ktn;
+pub mod python;
 
-use anyhow::{ensure, Result};
+use anyhow::{Result, ensure};
 use std::process::Command;
 
 /// 汎用 subprocess ランナー。`cmd [pre...] script [args...]` を実行する。
 pub(crate) fn sp(cmd: &str, pre: &[&str], script: &str, args: &[String]) -> Result<()> {
-    let s = Command::new(cmd).args(pre).arg(script).args(args).status()?;
+    let s = Command::new(cmd)
+        .args(pre)
+        .arg(script)
+        .args(args)
+        .status()?;
     ensure!(s.success(), "{cmd} exited with {s}");
     Ok(())
 }
@@ -16,10 +20,19 @@ pub(crate) fn sp(cmd: &str, pre: &[&str], script: &str, args: &[String]) -> Resu
 pub(super) fn cr(compiler: &str, cflags: &[&str], script: &str, args: &[String]) -> Result<()> {
     let out = format!("/tmp/polyscript_out_{}", std::process::id());
     ensure!(
-        Command::new(compiler).args(cflags).arg(script).arg("-o").arg(&out).status()?.success(),
+        Command::new(compiler)
+            .args(cflags)
+            .arg(script)
+            .arg("-o")
+            .arg(&out)
+            .status()?
+            .success(),
         "{compiler}: compilation failed"
     );
-    ensure!(Command::new(&out).args(args).status()?.success(), "binary exited non-zero");
+    ensure!(
+        Command::new(&out).args(args).status()?.success(),
+        "binary exited non-zero"
+    );
     Ok(())
 }
 
@@ -47,18 +60,18 @@ macro_rules! cr_bridge {
 
 // ── subprocess 型ブリッジ ──────────────────────────────────────────────────
 sp_bridge!(julia, "julia");
-sp_bridge!(go,    "go",       "run");
-sp_bridge!(js,    "node");
-sp_bridge!(ts,    "deno",     "run");
-sp_bridge!(lua,   "lua");
-sp_bridge!(r,     "Rscript");
-sp_bridge!(mojo,  "mojo");
-sp_bridge!(zig,   "zig",      "run");
-sp_bridge!(wasm,  "wasmtime", "run");
-sp_bridge!(hs,    "runghc");
+sp_bridge!(go, "go", "run");
+sp_bridge!(js, "node");
+sp_bridge!(ts, "deno", "run");
+sp_bridge!(lua, "lua");
+sp_bridge!(r, "Rscript");
+sp_bridge!(mojo, "mojo");
+sp_bridge!(zig, "zig", "run");
+sp_bridge!(wasm, "wasmtime", "run");
+sp_bridge!(hs, "runghc");
 sp_bridge!(swift, "swift");
-sp_bridge!(kt,    "kotlinc",  "-script");
-sp_bridge!(nim,   "nim",      "r");
+sp_bridge!(kt, "kotlinc", "-script");
+sp_bridge!(nim, "nim", "r");
 
 // ── compile & run 型ブリッジ ─────────────────────────────────────────────
 cr_bridge!(fort, "gfortran");

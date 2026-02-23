@@ -65,7 +65,10 @@ fn handle_conn(mut stream: UnixStream) -> Result<()> {
     for line in reader.lines() {
         let req: Req = serde_json::from_str(&line?)?;
         if req.stop {
-            writeln!(stream, r#"{{"exit":0,"stdout":"","stderr":"daemon stopped"}}"#)?;
+            writeln!(
+                stream,
+                r#"{{"exit":0,"stdout":"","stderr":"daemon stopped"}}"#
+            )?;
             // 全スレッドを安全に終了
             std::thread::spawn(|| {
                 std::thread::sleep(std::time::Duration::from_millis(100));
@@ -91,9 +94,15 @@ fn handle_conn(mut stream: UnixStream) -> Result<()> {
 
 /// `polyscript daemon run` — デーモン経由でスクリプトを実行（クライアント側）。
 pub fn run_via(lang: &str, script: &str, args: &[String]) -> Result<()> {
-    let req = Req { lang: lang.into(), script: script.into(), args: args.to_vec(), stop: false };
-    let mut stream = UnixStream::connect(SOCK)
-        .map_err(|_| anyhow::anyhow!("daemon not running — start with `polyscript daemon start`"))?;
+    let req = Req {
+        lang: lang.into(),
+        script: script.into(),
+        args: args.to_vec(),
+        stop: false,
+    };
+    let mut stream = UnixStream::connect(SOCK).map_err(|_| {
+        anyhow::anyhow!("daemon not running — start with `polyscript daemon start`")
+    })?;
     writeln!(stream, "{}", serde_json::to_string(&req)?)?;
     stream.shutdown(std::net::Shutdown::Write)?;
     for line in BufReader::new(stream).lines() {
@@ -107,9 +116,14 @@ pub fn run_via(lang: &str, script: &str, args: &[String]) -> Result<()> {
 
 /// `polyscript daemon stop` — デーモンへ停止シグナルを送る（クライアント側）。
 pub fn stop() -> Result<()> {
-    let req = Req { lang: "".into(), script: "".into(), args: vec![], stop: true };
-    let mut stream = UnixStream::connect(SOCK)
-        .map_err(|_| anyhow::anyhow!("daemon not running"))?;
+    let req = Req {
+        lang: "".into(),
+        script: "".into(),
+        args: vec![],
+        stop: true,
+    };
+    let mut stream =
+        UnixStream::connect(SOCK).map_err(|_| anyhow::anyhow!("daemon not running"))?;
     writeln!(stream, "{}", serde_json::to_string(&req)?)?;
     let mut buf = String::new();
     BufReader::new(stream).read_line(&mut buf)?;
