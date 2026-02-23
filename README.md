@@ -1,7 +1,7 @@
 # polyscript 🦀
 
-> Rust CLI that dispatches to **16 languages** via FFI bridges and subprocess.  
-> 187 lines of `src` across 5 files. Two macros generate 13 language bridges.
+> Rust CLI that dispatches to **17 languages** via FFI bridges and subprocess.  
+> 496 lines of `src` across 7 files. Two macros generate 13 language bridges.
 
 ---
 
@@ -15,7 +15,6 @@
 - [Bridge architecture](#bridge-architecture)
 - [Data IPC](#data-ipc)
 - [Known limitations](#known-limitations)
-- [Roadmap](#roadmap)
 - [License](#license)
 
 ---
@@ -69,10 +68,12 @@ sp_bridge!(js,    "node");
 | `hs` | GHC | subprocess | ~150 ms | DSL, type-level correctness |
 | `swift` | Swift | subprocess | ~200 ms | Apple SDK, Embedded Swift |
 | `kt` | Kotlin | subprocess | ~1 s | JVM, Android, coroutines |
+| `ktn` | Kotlin AOT | kotlinc→JAR→java | compile+JVM | JVM without scripting overhead |
 | `nim` | Nim | subprocess | ~100 ms | C-speed scripting |
 | `fort` | gfortran | compile+run | compile+~5 ms | HPC, CFD, legacy solvers |
 | `run` | polyscript.toml | alias dispatch | — | script registry |
-| `parallel` | any | thread-parallel | — | concurrent dispatch |
+| `parallel` | any | thread-parallel (py→subprocess) | — | concurrent dispatch |
+| `daemon` | — | UnixSocket JSON | — | persistent runtime |
 
 ---
 
@@ -138,8 +139,16 @@ polyscript wasm /tmp/example.wasm
 # polyscript.toml alias
 polyscript run preprocess /data/raw.parquet /tmp/features.arrow
 
-# Parallel execution — runs py and r concurrently in separate threads
+# Parallel execution — py uses python3 subprocess (GIL-safe), others use their normal bridge
 polyscript parallel "py scripts/python/example.py hello" "r scripts/r/example.r hello"
+
+# Kotlin AOT — compile to JAR first, then run (faster than kotlinc -script)
+polyscript ktn scripts/kotlin/example.kts hello
+
+# Daemon — start a persistent runtime, run scripts through it, then stop
+polyscript daemon start
+polyscript daemon run py scripts/python/example.py hello
+polyscript daemon stop
 
 # IPC — auto-generate POLYSCRIPT_IPC_PATH and inject into subprocess env
 polyscript --ipc-format=arrow py scripts/python/example.py
@@ -196,9 +205,12 @@ extern "C" int run(int argc, const char** argv) {
 
 ```
 polyscript
-├── bridge::python   PyO3 in-process          python.rs  (20 lines)
-├── bridge::cpp      libloading dynamic load   cpp.rs     (23 lines)
-└── bridge::mod      sp() / cr() + macros      mod.rs     (63 lines)
+├── bridge::python   PyO3 in-process + IPC env inject   python.rs  (28 lines)
+├── bridge::cpp      libloading + bindgen ffi            cpp.rs     (30 lines)
+├── bridge::julia    juliac AOT compile+run              julia.rs   (19 lines)
+├── bridge::ktn      kotlinc JAR AOT + java -jar         ktn.rs     (21 lines)
+├── bridge::mod      sp() / cr() + macros                mod.rs     (64 lines)
+└── daemon           UnixSocket JSON server/client       daemon.rs (118 lines)
      │
      ├─ sp(cmd, pre[], script, args[])
      │    └─ Command::new(cmd).args(pre).arg(script).args(args).status()
@@ -289,11 +301,11 @@ Arrow.write(ARGS[2], df)
 
 ## Known limitations
 
-- **Kotlin cold-start** — ~1 s JVM boot.
+- **Kotlin cold-start** — `kt` uses `kotlinc -script` (~1 s). Use `ktn` to skip scripting overhead (compile+JVM only).
 - **Julia requires juliac 1.12+** — experimental AOT compiler; Julia 1.12+ required.
-- **Concurrent `fort`** — both calls overwrite `/tmp/polyscript_out`. Mitigation: per-PID path (planned).
 - **No structured IPC** — data contracts are the caller's responsibility. Arrow IPC file path is the recommended workaround.
 - **Wasm `.wat` requires pre-compilation** — `wat2wasm example.wat -o example.wasm` before use.
+- **Daemon output routing** — script stdout/stderr is captured and returned as JSON; does not stream in real-time.
 
 ---
 
