@@ -1,0 +1,225 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # ── Rust: build / lint / fmt ─────────────────────────────────────────────
+  build:
+    name: Build & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Install Python dev headers (required by PyO3)
+        run: sudo apt-get update && sudo apt-get install -y python3-dev
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: cargo build
+        run: cargo build --release
+
+      - name: cargo clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: cargo fmt check
+        run: cargo fmt --all -- --check
+
+  # ── Language smoke tests ─────────────────────────────────────────────────
+  smoke:
+    name: Smoke Tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Python dev headers
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y python3-dev
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-smoke-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-smoke-
+
+      - name: Build polyscript
+        run: cargo build --release
+
+      # Python (PyO3 in-process)
+      - name: Smoke — py
+        run: ./target/release/polyscript py scripts/python/example.py smoke
+
+      # Go
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+      - name: Smoke — go
+        run: ./target/release/polyscript go scripts/go/example.go smoke
+
+      # Node.js
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Smoke — js
+        run: ./target/release/polyscript js scripts/js/example.js smoke
+
+      # Deno
+      - name: Set up Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: "2.x"
+      - name: Smoke — ts
+        run: ./target/release/polyscript ts scripts/ts/example.ts smoke
+
+      # Lua
+      - name: Install Lua (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y lua5.4
+      - name: Install Lua (macOS)
+        if: runner.os == 'macOS'
+        run: brew install lua
+      - name: Smoke — lua
+        run: ./target/release/polyscript lua scripts/lua/example.lua smoke
+
+      # R
+      - name: Set up R
+        uses: r-lib/setup-r@v2
+        with:
+          r-version: "4.3"
+      - name: Smoke — r
+        run: ./target/release/polyscript r scripts/r/example.r smoke
+
+      # GHC / Haskell
+      - name: Set up GHC
+        uses: haskell-actions/setup@v2
+        with:
+          ghc-version: "9.4"
+      - name: Smoke — hs
+        run: ./target/release/polyscript hs scripts/haskell/example.hs smoke
+
+      # Zig
+      - name: Set up Zig
+        uses: mlugg/setup-zig@v1
+        with:
+          version: "0.13.0"
+      - name: Smoke — zig
+        run: ./target/release/polyscript zig scripts/zig/example.zig smoke
+
+      # Nim
+      - name: Install Nim (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y nim
+      - name: Install Nim (macOS)
+        if: runner.os == 'macOS'
+        run: brew install nim
+      - name: Smoke — nim
+        run: ./target/release/polyscript nim scripts/nim/example.nim smoke
+
+      # GFortran
+      - name: Install gfortran (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y gfortran
+      - name: Install gfortran (macOS)
+        if: runner.os == 'macOS'
+        run: brew install gcc
+      - name: Smoke — fort
+        run: ./target/release/polyscript fort scripts/fortran/example.f90 smoke
+
+      # Kotlin
+      - name: Set up Java (for Kotlin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Install Kotlin
+        uses: fwilhe2/setup-kotlin@main
+        with:
+          version: "1.9.22"
+      - name: Smoke — kt
+        run: ./target/release/polyscript kt scripts/kotlin/example.kts smoke
+
+      # wasmtime
+      - name: Install wasmtime
+        uses: bytecodealliance/actions/install-wasmtime@v1
+      - name: Compile WAT → WASM
+        run: |
+          curl -fsSL https://github.com/WebAssembly/wabt/releases/download/1.0.35/wabt-1.0.35-ubuntu-20.04.tar.gz \
+            | tar -xz && mv wabt-1.0.35/bin/wat2wasm /usr/local/bin/ || true
+          wat2wasm scripts/wasm/example.wat -o /tmp/example.wasm 2>/dev/null || true
+      - name: Smoke — wasm
+        run: |
+          if [ -f /tmp/example.wasm ]; then
+            ./target/release/polyscript wasm /tmp/example.wasm
+          else
+            echo "wasm smoke skipped (wat2wasm not available)"
+          fi
+
+  # ── Daemon integration test ──────────────────────────────────────────────
+  daemon:
+    name: Daemon Integration Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Python dev headers
+        run: sudo apt-get update && sudo apt-get install -y python3-dev
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-daemon-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-daemon-
+
+      - name: Build polyscript
+        run: cargo build --release
+
+      - name: Daemon start → run → stop
+        run: |
+          BIN=./target/release/polyscript
+          $BIN daemon start
+          sleep 1
+          $BIN daemon run py scripts/python/example.py hello
+          $BIN daemon stop
+          sleep 1
+          echo "daemon test passed"
