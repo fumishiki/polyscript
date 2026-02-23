@@ -174,7 +174,13 @@ jobs:
 
       # wasmtime
       - name: Install wasmtime
-        uses: bytecodealliance/actions/install-wasmtime@v1
+        run: |
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            curl -fsSL https://wasmtime.dev/install.sh | bash
+            echo "$HOME/.wasmtime/bin" >> $GITHUB_PATH
+          else
+            brew install wasmtime
+          fi
       - name: Compile WAT → WASM
         run: |
           WABT_VER=1.0.35
